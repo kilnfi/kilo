@@ -150,15 +150,13 @@ jobs:
       uses: docker/setup-qemu-action@v2
       with:
         platforms: all
-    - name: Login to DockerHub
+    - name: Login to GitHub Container Registry
       if: github.event_name != 'pull_request'
       uses: docker/login-action@v2
       with:
-        username: ${{ secrets.DOCKER_USERNAME }}
-        password: ${{ secrets.DOCKER_PASSWORD }}
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
     - name: Build and push
       if: github.event_name != 'pull_request'
-      run: make manifest
-    - name: Build and push latest
-      if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
-      run: make manifest-latest
+      run: REGISTRY=ghcr.io IMAGE=kilnfi/kilo make container push
