@@ -310,7 +310,7 @@ func sync(table *route.Table, peerName string, privateKey wgtypes.Key, iface int
 	nodes := make(map[string]*mesh.Node)
 	var nodeNames []string
 	for _, n := range ns {
-		if n.Ready() {
+		if n.Ready(false) {
 			nodes[n.Name] = n
 			hostname = n.Name
 			nodeNames = append(nodeNames, n.Name)

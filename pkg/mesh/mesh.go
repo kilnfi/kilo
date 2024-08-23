@@ -50,6 +50,7 @@ const (
 // Mesh is able to create Kilo network meshes.
 type Mesh struct {
 	Backend
+	checkin             bool
 	cleanup             bool
 	cleanUpIface        bool
 	cni                 bool
@@ -89,7 +90,7 @@ type Mesh struct {
 }
 
 // New returns a new Mesh instance.
-func New(backend Backend, enc encapsulation.Encapsulator, granularity Granularity, hostname string, port int, subnet *net.IPNet, local, cni bool, cniPath, iface string, cleanup bool, cleanUpIface bool, createIface bool, mtu uint, resyncPeriod time.Duration, prioritisePrivateAddr, iptablesForwardRule bool, serviceCIDRs []*net.IPNet, logger log.Logger, registerer prometheus.Registerer) (*Mesh, error) {
+func New(backend Backend, enc encapsulation.Encapsulator, granularity Granularity, hostname string, port int, subnet *net.IPNet, local, cni bool, cniPath, iface string, checkin bool, cleanup bool, cleanUpIface bool, createIface bool, mtu uint, resyncPeriod time.Duration, prioritisePrivateAddr, iptablesForwardRule bool, serviceCIDRs []*net.IPNet, logger log.Logger, registerer prometheus.Registerer) (*Mesh, error) {
 	if err := os.MkdirAll(kiloPath, 0700); err != nil {
 		return nil, fmt.Errorf("failed to create directory to store configuration: %v", err)
 	}
@@ -168,6 +169,7 @@ func New(backend Backend, enc encapsulation.Encapsulator, granularity Granularit
 	}
 	mesh := Mesh{
 		Backend:             backend,
+		checkin:             checkin,
 		cleanup:             cleanup,
 		cleanUpIface:        cleanUpIface,
 		cni:                 cni,
@@ -269,6 +271,9 @@ func (m *Mesh) Run(ctx context.Context) error {
 	}
 	resync := time.NewTimer(m.resyncPeriod)
 	checkIn := time.NewTimer(checkInPeriod)
+	if !m.checkin {
+		checkIn.Stop()
+	}
 	nw := m.Nodes().Watch()
 	pw := m.Peers().Watch()
 	var ne *NodeEvent
@@ -304,7 +309,7 @@ func (m *Mesh) syncNodes(ctx context.Context, e *NodeEvent) {
 	}
 	var diff bool
 	m.mu.Lock()
-	if !e.Node.Ready() {
+	if !e.Node.Ready(m.checkin) {
 		// Trace non ready nodes with their presence in the mesh.
 		_, ok := m.nodes[e.Node.Name]
 		level.Debug(logger).Log("msg", "received non ready node", "node", e.Node, "in-mesh", ok)
@@ -313,7 +318,7 @@ func (m *Mesh) syncNodes(ctx context.Context, e *NodeEvent) {
 	case AddEvent:
 		fallthrough
 	case UpdateEvent:
-		if !nodesAreEqual(m.nodes[e.Node.Name], e.Node) {
+		if !nodesAreEqual(m.nodes[e.Node.Name], e.Node, m.checkin) {
 			diff = true
 		}
 		// Even if the nodes are the same,
@@ -416,7 +421,7 @@ func (m *Mesh) handleLocal(ctx context.Context, n *Node) {
 		AllowedLocationIPs:  n.AllowedLocationIPs,
 		Granularity:         m.granularity,
 	}
-	if !nodesAreEqual(n, local) {
+	if !nodesAreEqual(n, local, m.checkin) {
 		level.Debug(m.logger).Log("msg", "local node differs from backend")
 		if err := m.Nodes().Set(ctx, m.hostname, local); err != nil {
 			level.Error(m.logger).Log("error", fmt.Sprintf("failed to set local node: %v", err), "node", local)
@@ -432,7 +437,7 @@ func (m *Mesh) handleLocal(ctx context.Context, n *Node) {
 		n = &Node{}
 	}
 	m.mu.Unlock()
-	if !nodesAreEqual(n, local) {
+	if !nodesAreEqual(n, local, m.checkin) {
 		m.mu.Lock()
 		m.nodes[local.Name] = local
 		m.mu.Unlock()
@@ -455,7 +460,7 @@ func (m *Mesh) applyTopology() {
 	var readyNodes float64
 	for k := range m.nodes {
 		m.nodes[k].Granularity = m.granularity
-		if !m.nodes[k].Ready() {
+		if !m.nodes[k].Ready(m.checkin) {
 			continue
 		}
 		// Make it point to the node without copy.
@@ -635,7 +640,7 @@ func (m *Mesh) resolveEndpoints() error {
 	for k := range m.nodes {
 		// Skip unready nodes, since they will not be used
 		// in the topology anyways.
-		if !m.nodes[k].Ready() {
+		if !m.nodes[k].Ready(m.checkin) {
 			continue
 		}
 		// Resolve the Endpoint
@@ -664,7 +669,7 @@ func isSelf(hostname string, node *Node) bool {
 	return node != nil && node.Name == hostname
 }
 
-func nodesAreEqual(a, b *Node) bool {
+func nodesAreEqual(a, b *Node, checkLastSeen bool) bool {
 	if (a != nil) != (b != nil) {
 		return false
 	}
@@ -686,7 +691,7 @@ func nodesAreEqual(a, b *Node) bool {
 		a.Location == b.Location &&
 		a.Name == b.Name &&
 		subnetsEqual(a.Subnet, b.Subnet) &&
-		a.Ready() == b.Ready() &&
+		a.Ready(checkLastSeen) == b.Ready(checkLastSeen) &&
 		a.PersistentKeepalive == b.PersistentKeepalive &&
 		discoveredEndpointsAreEqual(a.DiscoveredEndpoints, b.DiscoveredEndpoints) &&
 		ipNetSlicesEqual(a.AllowedLocationIPs, b.AllowedLocationIPs) &&

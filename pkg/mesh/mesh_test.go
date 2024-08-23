@@ -120,7 +120,7 @@ func TestReady(t *testing.T) {
 			ready: true,
 		},
 	} {
-		ready := tc.node.Ready()
+		ready := tc.node.Ready(false)
 		if ready != tc.ready {
 			t.Errorf("test case %q: expected %t, got %t", tc.name, tc.ready, ready)
 		}

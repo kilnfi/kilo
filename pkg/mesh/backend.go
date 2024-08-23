@@ -79,13 +79,19 @@ type Node struct {
 }
 
 // Ready indicates whether or not the node is ready.
-func (n *Node) Ready() bool {
+func (n *Node) Ready(checkLastSeen bool) bool {
 	// Nodes that are not leaders will not have WireGuardIPs, so it is not required.
+	var checkedIn bool
+	if checkLastSeen {
+		checkedIn = time.Now().Unix()-n.LastSeen < int64(checkInPeriod)*2/int64(time.Second)
+	} else {
+		checkedIn = true
+	}
 	return n != nil &&
 		n.Endpoint.Ready() &&
 		n.Key != wgtypes.Key{} &&
 		n.Subnet != nil &&
-		time.Now().Unix()-n.LastSeen < int64(checkInPeriod)*2/int64(time.Second)
+		checkedIn
 }
 
 // Peer represents a peer in the network.
