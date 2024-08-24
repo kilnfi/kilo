@@ -130,7 +130,7 @@ func runShowConfNode(_ *cobra.Command, args []string) error {
 	subnet := mesh.DefaultKiloSubnet
 	nodes := make(map[string]*mesh.Node)
 	for _, n := range ns {
-		if n.Ready(false) {
+		if n.Ready() {
 			nodes[n.Name] = n
 		}
 		if n.WireGuardIP != nil {
@@ -147,7 +147,7 @@ func runShowConfNode(_ *cobra.Command, args []string) error {
 
 	peers := make(map[string]*mesh.Peer)
 	for _, p := range ps {
-		if p.Ready(false) {
+		if p.Ready() {
 			peers[p.Name] = p
 		}
 	}
@@ -227,7 +227,7 @@ func runShowConfPeer(_ *cobra.Command, args []string) error {
 	subnet := mesh.DefaultKiloSubnet
 	nodes := make(map[string]*mesh.Node)
 	for _, n := range ns {
-		if n.Ready(false) {
+		if n.Ready() {
 			nodes[n.Name] = n
 			hostname = n.Name
 		}
@@ -243,7 +243,7 @@ func runShowConfPeer(_ *cobra.Command, args []string) error {
 	peer := args[0]
 	peers := make(map[string]*mesh.Peer)
 	for _, p := range ps {
-		if p.Ready(false) {
+		if p.Ready() {
 			peers[p.Name] = p
 		}
 	}

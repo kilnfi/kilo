@@ -309,7 +309,7 @@ func (m *Mesh) syncNodes(ctx context.Context, e *NodeEvent) {
 	}
 	var diff bool
 	m.mu.Lock()
-	if !e.Node.Ready(m.checkin) {
+	if !e.Node.Ready() {
 		// Trace non ready nodes with their presence in the mesh.
 		_, ok := m.nodes[e.Node.Name]
 		level.Debug(logger).Log("msg", "received non ready node", "node", e.Node, "in-mesh", ok)
@@ -318,7 +318,7 @@ func (m *Mesh) syncNodes(ctx context.Context, e *NodeEvent) {
 	case AddEvent:
 		fallthrough
 	case UpdateEvent:
-		if !nodesAreEqual(m.nodes[e.Node.Name], e.Node, m.checkin) {
+		if !nodesAreEqual(m.nodes[e.Node.Name], e.Node) {
 			diff = true
 		}
 		// Even if the nodes are the same,
@@ -421,7 +421,7 @@ func (m *Mesh) handleLocal(ctx context.Context, n *Node) {
 		AllowedLocationIPs:  n.AllowedLocationIPs,
 		Granularity:         m.granularity,
 	}
-	if !nodesAreEqual(n, local, m.checkin) {
+	if !nodesAreEqual(n, local) {
 		level.Debug(m.logger).Log("msg", "local node differs from backend")
 		if err := m.Nodes().Set(ctx, m.hostname, local); err != nil {
 			level.Error(m.logger).Log("error", fmt.Sprintf("failed to set local node: %v", err), "node", local)
@@ -437,7 +437,7 @@ func (m *Mesh) handleLocal(ctx context.Context, n *Node) {
 		n = &Node{}
 	}
 	m.mu.Unlock()
-	if !nodesAreEqual(n, local, m.checkin) {
+	if !nodesAreEqual(n, local) {
 		m.mu.Lock()
 		m.nodes[local.Name] = local
 		m.mu.Unlock()
@@ -460,7 +460,7 @@ func (m *Mesh) applyTopology() {
 	var readyNodes float64
 	for k := range m.nodes {
 		m.nodes[k].Granularity = m.granularity
-		if !m.nodes[k].Ready(m.checkin) {
+		if !m.nodes[k].Ready() {
 			continue
 		}
 		// Make it point to the node without copy.
@@ -640,7 +640,7 @@ func (m *Mesh) resolveEndpoints() error {
 	for k := range m.nodes {
 		// Skip unready nodes, since they will not be used
 		// in the topology anyways.
-		if !m.nodes[k].Ready(m.checkin) {
+		if !m.nodes[k].Ready() {
 			continue
 		}
 		// Resolve the Endpoint
@@ -669,7 +669,7 @@ func isSelf(hostname string, node *Node) bool {
 	return node != nil && node.Name == hostname
 }
 
-func nodesAreEqual(a, b *Node, checkLastSeen bool) bool {
+func nodesAreEqual(a, b *Node) bool {
 	if (a != nil) != (b != nil) {
 		return false
 	}
@@ -691,7 +691,7 @@ func nodesAreEqual(a, b *Node, checkLastSeen bool) bool {
 		a.Location == b.Location &&
 		a.Name == b.Name &&
 		subnetsEqual(a.Subnet, b.Subnet) &&
-		a.Ready(checkLastSeen) == b.Ready(checkLastSeen) &&
+		a.Ready() == b.Ready() &&
 		a.PersistentKeepalive == b.PersistentKeepalive &&
 		discoveredEndpointsAreEqual(a.DiscoveredEndpoints, b.DiscoveredEndpoints) &&
 		ipNetSlicesEqual(a.AllowedLocationIPs, b.AllowedLocationIPs) &&

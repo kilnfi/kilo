@@ -51,7 +51,7 @@ func (h *graphHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	nodes := make(map[string]*mesh.Node)
 	for _, n := range ns {
-		if n.Ready(false) {
+		if n.Ready() {
 			nodes[n.Name] = n
 		}
 	}
