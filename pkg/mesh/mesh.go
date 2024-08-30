@@ -162,6 +162,24 @@ func New(backend Backend, enc encapsulation.Encapsulator, granularity Granularit
 	} else {
 		externalIP = publicIP
 	}
+	if publicIP == nil {
+		// Try to discover publicIP from endpoint/force-endpoint annotations
+		node, err := backend.Nodes().Get(hostname)
+		if err != nil {
+			level.Debug(logger).Log("msg", "could not get local node from backend", err)
+		}
+		if node != nil {
+			if node.Endpoint != nil {
+				backendIP := node.Endpoint.IP()
+				if isPublic(backendIP) {
+					_, publicIP, err = net.ParseCIDR(backendIP.String())
+					if err != nil {
+						level.Debug(logger).Log("msg", "could not parse backend endpoint address", backendIP.String())
+					}
+				}
+			}
+		}
+	}
 	level.Debug(logger).Log("msg", fmt.Sprintf("using %s as the public IP address", publicIP.String()))
 	ipTables, err := iptables.New(iptables.WithRegisterer(registerer), iptables.WithLogger(log.With(logger, "component", "iptables")), iptables.WithResyncPeriod(resyncPeriod))
 	if err != nil {
